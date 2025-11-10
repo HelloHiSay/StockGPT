@@ -9,10 +9,10 @@ class Args:
     seq_len = 60
     batch_size = 64
     lr = 1e-4
-    epochs = 10
+    epochs = 100
     
     # 使用 GPU，如果可用，否则回退 CPU
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda"
     
     checkpoints = "checkpoints"
 

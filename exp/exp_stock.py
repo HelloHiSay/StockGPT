@@ -1,25 +1,30 @@
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from data_provider.stock_loader import StockDataset
 from models.stock_gpt import StockGPT
+from utils.early_stop import EarlyStopping
+from utils.metrics import mae, rmse
 import os
+import matplotlib.pyplot as plt
 
 class Exp_Stock:
     def __init__(self, args):
         self.args = args
         self.device = args.device
-        
-        # 加载数据
-        self.train_dataset = StockDataset(args.data_path, seq_len=args.seq_len)
-        self.train_loader = DataLoader(
-            self.train_dataset, 
-            batch_size=args.batch_size, 
-            shuffle=True,
-            num_workers=0
-        )
-        
-        # 初始化模型
+
+        # 数据加载
+        full_dataset = StockDataset(args.data_path, seq_len=args.seq_len)
+        val_size = int(0.2 * len(full_dataset))
+        train_size = len(full_dataset) - val_size
+
+        self.train_dataset, self.val_dataset = random_split(full_dataset, [train_size, val_size])
+
+        self.train_loader = DataLoader(self.train_dataset, batch_size=args.batch_size, shuffle=True)
+        self.val_loader = DataLoader(self.val_dataset, batch_size=args.batch_size, shuffle=False)
+
+        # 模型
         self.model = StockGPT(
             seq_len=args.seq_len,
             d_model=128,
@@ -27,75 +32,101 @@ class Exp_Stock:
             num_layers=4,
             dropout=0.1
         ).to(self.device)
-        
-        # 优化器和损失函数
+
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
         self.criterion = nn.MSELoss()
-        
+
+        self.early_stopper = EarlyStopping(patience=10, verbose=True)
+        self.checkpoint_path = os.path.join(args.checkpoints, "best_model.pth")
+
     def train_batch(self, X_batch, y_batch):
-        """训练一个批次"""
-        X_batch = X_batch.to(self.device)  # (batch, seq_len, 1)
-        y_batch = y_batch.to(self.device)  # (batch, 1)
-        
-        # 前向传播
+        self.model.train()
+        X_batch = X_batch.to(self.device)
+        y_batch = y_batch.to(self.device)
+
         predictions = self.model(X_batch)
-        
-        # 处理预测形状：确保是 (batch, 1)
-        # 如果模型返回了 (batch, seq_len, 1)，只取最后一个时间步
-        if predictions.dim() == 3:
-            predictions = predictions[:, -1, :]  # (batch, 1)
-        # 如果返回了 (batch, seq_len)，只取最后一个
-        elif predictions.dim() == 2 and predictions.size(1) > 1:
-            predictions = predictions[:, -1:]  # (batch, 1)
-        # 如果返回了 (batch,)，扩展为 (batch, 1)
-        elif predictions.dim() == 1:
-            predictions = predictions.unsqueeze(1)
-        
-        # 确保 y_batch 形状是 (batch, 1)
-        if y_batch.dim() == 3:
-            y_batch = y_batch.squeeze(-1) if y_batch.size(-1) == 1 else y_batch[:, -1, :]
-        elif y_batch.dim() == 1:
-            y_batch = y_batch.unsqueeze(1)
-        elif y_batch.dim() == 2 and y_batch.size(1) > 1:
-            y_batch = y_batch[:, 0:1]  # 只取第一个特征
-        
-        # 最终检查：确保形状匹配
-        assert predictions.shape == y_batch.shape, f"形状不匹配: predictions {predictions.shape} vs y_batch {y_batch.shape}"
-        
+        predictions = predictions.squeeze(-1)
+        y_batch = y_batch.squeeze(-1)
+
         loss = self.criterion(predictions, y_batch)
-        
-        # 反向传播
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        
+
         return loss.item()
-    
+
+    def evaluate(self):
+        self.model.eval()
+        total_loss = 0
+        all_preds = []
+        all_targets = []
+
+        with torch.no_grad():
+            for X_batch, y_batch in self.val_loader:
+                X_batch = X_batch.to(self.device)
+                y_batch = y_batch.to(self.device)
+
+                preds = self.model(X_batch)
+                preds = preds.squeeze(-1)
+                y_batch = y_batch.squeeze(-1)
+
+                loss = self.criterion(preds, y_batch)
+                total_loss += loss.item()
+
+                all_preds.append(preds.cpu().numpy())
+                all_targets.append(y_batch.cpu().numpy())
+
+        avg_loss = total_loss / len(self.val_loader)
+        preds_np = np.concatenate(all_preds)
+        targets_np = np.concatenate(all_targets)
+
+        return avg_loss, mae(preds_np, targets_np), rmse(preds_np, targets_np)
+
     def train(self):
-        """训练模型"""
-        print(f"开始训练，共 {len(self.train_loader)} 个批次")
-        
+        print(f"开始训练，共 {len(self.train_loader)} 个训练批次，{len(self.val_loader)} 个验证批次")
+        train_losses = []
+        val_losses = []
+
         for epoch in range(self.args.epochs):
-            self.model.train()
-            train_losses = []
-            
-            for batch_idx, (X_batch, y_batch) in enumerate(self.train_loader):
+            epoch_train_loss = []
+            for X_batch, y_batch in self.train_loader:
                 loss = self.train_batch(X_batch, y_batch)
-                train_losses.append(loss)
-                
-                if (batch_idx + 1) % 10 == 0:
-                    print(f"Epoch {epoch+1}/{self.args.epochs} | Batch {batch_idx+1}/{len(self.train_loader)} | Loss: {loss:.6f}")
-            
-            avg_loss = sum(train_losses) / len(train_losses)
-            print(f"Epoch {epoch+1}/{self.args.epochs} | Average Loss: {avg_loss:.6f}")
-            
-            # 保存模型检查点
-            if (epoch + 1) % 5 == 0:
-                checkpoint_path = os.path.join(self.args.checkpoints, f"model_epoch_{epoch+1}.pth")
+                epoch_train_loss.append(loss)
+
+            avg_train_loss = sum(epoch_train_loss) / len(epoch_train_loss)
+            train_losses.append(avg_train_loss)
+
+            val_loss, val_mae, val_rmse = self.evaluate()
+            val_losses.append(val_loss)
+
+            print(f"Epoch {epoch+1}/{self.args.epochs} | Train Loss: {avg_train_loss:.6f} | Val Loss: {val_loss:.6f} | MAE: {val_mae:.4f} | RMSE: {val_rmse:.4f}")
+
+            self.early_stopper(val_loss, self.model, self.checkpoint_path)
+            if self.early_stopper.early_stop:
+                print("Early stopping 触发，训练终止。")
+                break
+
+            # ✅ 保存完整 checkpoint（让 predict.py 能正常读取）
+            if val_loss == min(val_losses):  # 每次验证损失最低时保存
                 torch.save({
                     'epoch': epoch + 1,
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
-                    'loss': avg_loss,
-                }, checkpoint_path)
-                print(f"模型已保存到: {checkpoint_path}")
+                    'loss': val_loss,
+                }, self.checkpoint_path)
+                print(f"✅ 模型已保存到: {self.checkpoint_path}")
+
+        self.plot_loss(train_losses, val_losses)
+
+    def plot_loss(self, train_losses, val_losses):
+        plt.figure()
+        plt.plot(train_losses, label="Train Loss")
+        plt.plot(val_losses, label="Val Loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training & Validation Loss")
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(self.args.checkpoints, "loss_curve.png"))
+        plt.close()
