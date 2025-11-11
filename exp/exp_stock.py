@@ -6,6 +6,7 @@ from data_provider.stock_loader import StockDataset
 from models.stock_gpt import StockGPT
 from utils.early_stop import EarlyStopping
 from utils.metrics import mae, rmse
+from config.config import StockConfig
 import os
 import matplotlib.pyplot as plt
 
@@ -20,18 +21,20 @@ class Exp_Stock:
         train_size = len(full_dataset) - val_size
 
         self.train_dataset, self.val_dataset = random_split(full_dataset, [train_size, val_size])
-
         self.train_loader = DataLoader(self.train_dataset, batch_size=args.batch_size, shuffle=True)
         self.val_loader = DataLoader(self.val_dataset, batch_size=args.batch_size, shuffle=False)
 
-        # 模型
+        #block_size要匹配seq_len
+        config = StockConfig(block_size=args.seq_len)
+
         self.model = StockGPT(
             seq_len=args.seq_len,
-            d_model=128,
-            nhead=8,
-            num_layers=4,
-            dropout=0.1
+            d_model=config.hidden_dim,
+            dropout=config.dropout,
         ).to(self.device)
+
+        print(f"模型结构配置：{config}")
+        print(f"模型总参数量: {sum(p.numel() for p in self.model.parameters())}")
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
         self.criterion = nn.MSELoss()
@@ -44,12 +47,10 @@ class Exp_Stock:
         X_batch = X_batch.to(self.device)
         y_batch = y_batch.to(self.device)
 
-        predictions = self.model(X_batch)
-        predictions = predictions.squeeze(-1)
+        predictions = self.model(X_batch).squeeze(-1)
         y_batch = y_batch.squeeze(-1)
 
         loss = self.criterion(predictions, y_batch)
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -67,8 +68,7 @@ class Exp_Stock:
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
 
-                preds = self.model(X_batch)
-                preds = preds.squeeze(-1)
+                preds = self.model(X_batch).squeeze(-1)
                 y_batch = y_batch.squeeze(-1)
 
                 loss = self.criterion(preds, y_batch)
@@ -89,11 +89,7 @@ class Exp_Stock:
         val_losses = []
 
         for epoch in range(self.args.epochs):
-            epoch_train_loss = []
-            for X_batch, y_batch in self.train_loader:
-                loss = self.train_batch(X_batch, y_batch)
-                epoch_train_loss.append(loss)
-
+            epoch_train_loss = [self.train_batch(X_batch, y_batch) for X_batch, y_batch in self.train_loader]
             avg_train_loss = sum(epoch_train_loss) / len(epoch_train_loss)
             train_losses.append(avg_train_loss)
 
@@ -107,8 +103,7 @@ class Exp_Stock:
                 print("Early stopping 触发，训练终止。")
                 break
 
-            # ✅ 保存完整 checkpoint（让 predict.py 能正常读取）
-            if val_loss == min(val_losses):  # 每次验证损失最低时保存
+            if val_loss == min(val_losses):
                 torch.save({
                     'epoch': epoch + 1,
                     'model_state_dict': self.model.state_dict(),
