@@ -13,7 +13,7 @@ def download_stock_data(symbol="600519", adjust="qfq", max_retries=3, retry_dela
                 symbol=symbol,
                 period="daily",
                 start_date="20000101",
-                end_date="20251231",
+                end_date="20251201",
                 adjust=adjust
             )
 
@@ -24,7 +24,7 @@ def download_stock_data(symbol="600519", adjust="qfq", max_retries=3, retry_dela
 
             # 保存到 StockGPT 根目录
             current_folder = os.path.dirname(os.path.abspath(__file__))
-            file_path = os.path.join(current_folder, f"{symbol}_data.csv")
+            file_path = os.path.join(current_folder, f"{symbol}_data_contrast.csv")
 
             df.to_csv(file_path, index=False)
             print(f"已成功下载 {symbol} 数据，保存到 {file_path}")
