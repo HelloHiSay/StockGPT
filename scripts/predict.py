@@ -9,6 +9,7 @@ import os
 import sys
 import argparse
 from datetime import datetime, timedelta
+from config.config import StockConfig
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -160,7 +161,13 @@ if __name__ == '__main__':
         exit(1)
 
     print(f"加载模型检查点: {checkpoint_path}")
-    model = StockGPT(seq_len, 128, 8, 4, 0.1).to(device)
+    config = StockConfig(block_size=seq_len)
+    model = StockGPT(
+        seq_len=config.block_size,
+        d_model=config.hidden_dim,
+        dropout=config.dropout
+    ).to(device)
+
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
