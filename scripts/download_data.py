@@ -12,8 +12,8 @@ def download_stock_data(symbol="600519", adjust="qfq", max_retries=3, retry_dela
             df = ak.stock_zh_a_hist(
                 symbol=symbol,
                 period="daily",
-                start_date="20000101",
-                end_date="20251101",
+                start_date="20180101",
+                end_date="20251111",
                 adjust=adjust
             )
 
