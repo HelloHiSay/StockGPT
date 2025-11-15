@@ -59,9 +59,20 @@ StockGPT/
 
 # 模型结构
 
-```mermaid
 
-```
+
+StockGPT 模型维度流水（单个 Transformer Block）:
+
+- Inputs:            (64, 60, 1)          # 原始输入序列，batch=64, 序列长度=60, 特征=1
+  Embedding:         (64, 60, 512)        # 输入经过线性 embedding 层，将特征维度映射到 d_model=512
+  Multi-Head Attention (MHA):
+  Q, K, V:         (64, 60, 512)        # 计算 Q,K,V 张量
+  Heads:           (64, 8, 60, 64)      # 拆分成 8 个头，每个 head 维度 head_dim=64
+  Output:          (64, 60, 512)        # 多头注意力 concat 后，再投影回 d_model=512
+  Feed-Forward Network (FFN):
+  Expand:          (64, 60, 2048)       # 先将 hidden_dim 扩展 4 倍
+  Reduce:          (64, 60, 512)        # 再降回 hidden_dim=512
+  Prediction:        (64, 60, 1)          # 输出股价预测，单特征
 
 
 ## 1️⃣ Inputs: `(64, 60, 1)`
