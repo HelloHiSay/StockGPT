@@ -24,6 +24,7 @@ StockGPT 项目（GPT-style Transformer 用于股票价格预测）
 项目结构：
 
 ```
+
 StockGPT/
 ├── pretrain.py                # 预训练入口
 ├── README.md                  # 项目说明
@@ -55,11 +56,10 @@ StockGPT/
 └── utils/                     # 工具箱
 ├── early\_stop.py           # 早停策略
 └── metrics.py              # 评价指标（MAE、RMSE）
+└── structure.png          # 模型结构图
 ```
 
 # 模型结构
-
-
 
 StockGPT 模型维度流水（单个 Transformer Block）:
 
@@ -73,7 +73,6 @@ StockGPT 模型维度流水（单个 Transformer Block）:
   - Expand:          (64, 60, 2048)       # 先将 hidden_dim 扩展 4 倍
   - Reduce:          (64, 60, 512)        # 再降回 hidden_dim=512
 - Prediction:        (64, 60, 1)          # 输出股价预测，单特征
-
 
 ## 1️⃣ Inputs: `(64, 60, 1)`
 
