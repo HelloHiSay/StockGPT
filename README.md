@@ -22,56 +22,46 @@ StockGPT 项目（GPT-style Transformer 用于股票价格预测）
    ```
 
 项目结构：
+
+```
 StockGPT/
-│
-├── pretrain.py              # 预训练入口
-├── README.md                # 项目说明
-├── requirements.txt         # 依赖列表
-│
-├── checkpoints/             # 模型权重与训练曲线
-│   ├── best_model.pth       # 当前最优权重
-│   ├── best_model_1.pth     # 历史最优权重（备份）
-│   └── loss_curve.png       # 训练 loss 曲线图
-│
-├── config/                  # 统一配置
-│   └── config.py            # 所有可调整超参、路径、模型规模
-│
-├── data_provider/           # 数据加载与预处理
-│   └── stock_loader.py      # 返回 train/valid/test DataLoader
-│
-├── exp/                     # 实验流程封装（训练、验证、测试一条龙）
-│   └── exp_stock.py         # StockGPT 实验类，主逻辑在这里
-│
-├── models/                  # 模型定义
-│   ├── models.py            # 通用模型骨架（可复用）
-│   ├── stock_gpt.py         # StockGPT 具体结构（Transformer + 股票特征）
-│   └── positional_encoding.py # 位置编码（时间步/交易日）
-│
-├── results/                 # 推理输出
-│   ├── future_predictions.csv   # 未来 N 日预测值
-│   ├── future_predictions.png   # 预测曲线图
-│   └── prediction_history.png   # 历史回测图
-│
-├── scripts/                 # 数据与脚本工具
-│   ├── download_data.py     # 自动下载股票日线数据
-│   ├── predict.py           # 单脚本快速推理（加载权重直接出图）
-│   ├── 600519_data.csv          # 示例原始数据
-│   ├── 600519_data_contrast.csv # 预测 vs 真实对比
-│   └── 600519_data_truth.csv    # 真实标签（用于回测）
-│
-└── utils/                   # 工具箱
-├── early_stop.py        # 早停策略
-└── metrics.py           # 评价指标（MAE、RMSE）
+├── pretrain.py                # 预训练入口
+├── README.md                  # 项目说明
+├── requirements.txt           # 依赖列表
+├── checkpoints/               # 模型权重与训练曲线
+│   ├── best\_model.pth         # 当前最优权重
+│   ├── best\_model\_1.pth       # 历史最优权重（备份）
+│   └── loss\_curve.png          # 训练 loss 曲线图
+├── config/                    # 配置文件
+│   └── config.py               # 超参、路径、模型规模
+├── data\_provider/             # 数据加载与预处理
+│   └── stock\_loader.py         # 返回 train/valid/test DataLoader
+├── exp/                       # 实验流程封装（训练/验证/测试）
+│   └── exp\_stock.py            # StockGPT 实验类，主逻辑
+├── models/                    # 模型定义
+│   ├── models.py               # 通用模型骨架
+│   ├── stock\_gpt.py            # StockGPT 具体结构（Transformer + 股票特征）
+│   └── positional\_encoding.py  # 位置编码（时间步/交易日）
+├── results/                   # 推理输出
+│   ├── future\_predictions.csv  # 未来 N 日预测值
+│   ├── future\_predictions.png  # 预测曲线图
+│   └── prediction\_history.png  # 历史回测图
+├── scripts/                   # 数据与脚本工具
+│   ├── download\_data.py        # 自动下载股票日线数据
+│   ├── predict.py              # 单脚本快速推理（加载权重直接出图）
+│   ├── 600519\_data.csv         # 示例原始数据
+│   ├── 600519\_data\_contrast.csv# 预测 vs 真实对比
+│   └── 600519\_data\_truth.csv   # 真实标签（用于回测）
+└── utils/                     # 工具箱
+├── early\_stop.py           # 早停策略
+└── metrics.py              # 评价指标（MAE、RMSE）
+```
 
 # 模型结构
 
-Inputs:          (64, 60, 1)          # 原始输入序列，单特征
-Embedding:       (64, 60, 512)        # 输入经过线性 embedding 层
-MHA Q,K,V:       (64, 60, 512)        # Multi-Head Attention 的 Q,K,V 维度
-Heads:           (64, 8, 60, 64)      # 将 hidden_dim 拆分到每个头
-MHA Output:      (64, 60, 512)        # 多头注意力 concat 后再投影回 d_model
-FFN:             (64, 60, 2048) → (64, 60, 512)  # FFN 先扩维再降回 hidden_dim
-Prediction:      (64, 60, 1)          # 输出预测股价
+```mermaid
+
+```
 
 
 ## 1️⃣ Inputs: `(64, 60, 1)`
