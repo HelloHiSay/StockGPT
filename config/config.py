@@ -9,7 +9,7 @@ class StockConfig:
     hidden_dim: int = 512    # embedding维度（即d_model）
     head_size: int = 64       # 每个注意力头的维度hidden_dim // n_head
     dropout: float = 0.3      # Dropout 概率
-    block_size: int = 60      # 序列长度（最大输入长度）
+    block_size: int = 60      # 序列长度（最大输入长度） 要与seq_len一样，保持维度一致
 
     # 路径配置
     base_dir = os.path.dirname(os.path.abspath(__file__))
