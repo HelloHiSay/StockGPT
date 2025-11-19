@@ -100,7 +100,7 @@ def train():
 
     print("\n训练结束！最佳模型已保存：", best_model_path)
 
-    # ===================== 保存 scaler（关键!!!） =====================
+    # ===================== 保存 scaler=====================
     feature_scaler_path = os.path.join(cfg.checkpoints, "feature_scaler.pkl")
     target_scaler_path  = os.path.join(cfg.checkpoints, "target_scaler.pkl")
 
@@ -115,6 +115,9 @@ def train():
     plt.figure(figsize=(10,5))
     plt.plot(train_losses, label='Train Loss')
     plt.plot(val_losses, label='Validation Loss')
+
+    plt.ylim(0, max(train_losses[0], val_losses[0]) * 1.1)
+
     plt.xlabel("Epoch")
     plt.ylabel("MSE Loss")
     plt.title("Training & Validation Loss")
